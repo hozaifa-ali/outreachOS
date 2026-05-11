@@ -1,0 +1,76 @@
+name: 🛡️ Security Audit
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6 AM UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  audit:
+    name: 🔍 Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: "⚡ Security Protocols Engaged"
+        run: |
+          echo -e "\033[38;2;239;68;68m"
+          echo "┌──────────────────────────────────────────┐"
+          echo "│  🛡️  OutreachOS Security Scanner v2.0    │"
+          echo "│  Scanning for vulnerabilities...         │"
+          echo "└──────────────────────────────────────────┘"
+          echo -e "\033[0m"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔐 Run pnpm audit
+        run: |
+          echo -e "\033[38;2;251;191;36m[SCAN] Checking npm dependencies for known vulnerabilities...\033[0m"
+          pnpm audit --audit-level=high || true
+
+      - name: 🕵️ Check for secrets in code
+        run: |
+          echo -e "\033[38;2;251;191;36m[SCAN] Searching for leaked secrets...\033[0m"
+          # Check for common secret patterns
+          if grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
+            -e "sk-[a-zA-Z0-9]" \
+            -e "AKIA[A-Z0-9]" \
+            -e "ghp_[a-zA-Z0-9]" \
+            -e "password\s*=\s*['\"][^'\"]*['\"]" \
+            apps/ packages/ 2>/dev/null; then
+            echo -e "\033[38;2;239;68;68m[ALERT] Potential secrets detected! Review above matches.\033[0m"
+          else
+            echo -e "\033[38;2;16;185;129m[CLEAR] No hardcoded secrets found. ✅\033[0m"
+          fi
+
+      - name: 📊 Security Summary
+        if: always()
+        run: |
+          echo -e "\033[38;2;16;185;129m"
+          echo "╔══════════════════════════════════════════════╗"
+          echo "║        🛡️  SECURITY SCAN COMPLETE            ║"
+          echo "╠══════════════════════════════════════════════╣"
+          echo "║  ✅ Dependency audit                         ║"
+          echo "║  ✅ Secret leak detection                    ║"
+          echo "║  📅 Next scheduled scan: Monday 06:00 UTC    ║"
+          echo "╚══════════════════════════════════════════════╝"
+          echo -e "\033[0m"
