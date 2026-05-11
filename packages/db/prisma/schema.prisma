@@ -1,0 +1,383 @@
+// ============================================
+// OutreachOS — Prisma Schema
+// Full database schema from architecture doc §4
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Organizations (Tenants) ─────────────────────────────────────────
+
+model Organization {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  slug         String   @unique
+  plan         String   @default("starter") // starter|growth|pro|enterprise
+  seats        Int      @default(1)
+  emailCredits Int      @default(1000) @map("email_credits")
+  timezone     String   @default("UTC")
+  whiteLabel   Json?    @map("white_label") // {domain, logo_url, primary_color, name}
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  users          User[]
+  contactLists   ContactList[]
+  contacts       Contact[]
+  mailboxes      Mailbox[]
+  campaigns      Campaign[]
+  inboxThreads   InboxThread[]
+  templates      Template[]
+  subscription   Subscription?
+  auditLogs      AuditLog[]
+
+  @@map("organizations")
+}
+
+// ─── Users ───────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  orgId        String    @map("org_id") @db.Uuid
+  email        String    @unique
+  passwordHash String?   @map("password_hash")
+  fullName     String?   @map("full_name")
+  role         String    @default("sender") // owner|admin|manager|sender|viewer
+  avatarUrl    String?   @map("avatar_url")
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contactLists   ContactList[]
+  campaigns      Campaign[]
+  assignedThreads InboxThread[]
+  templates      Template[]
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+// ─── Refresh Tokens ──────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Contact Lists ───────────────────────────────────────────────────
+
+model ContactList {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  name      String
+  source    String?  // csv_upload|google_sheets|hubspot|salesforce|manual
+  total     Int      @default(0)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creator      User?        @relation(fields: [createdBy], references: [id])
+  contacts     Contact[]
+  campaigns    Campaign[]
+
+  @@map("contact_lists")
+}
+
+// ─── Contacts ────────────────────────────────────────────────────────
+
+model Contact {
+  id           String    @id @default(uuid()) @db.Uuid
+  orgId        String    @map("org_id") @db.Uuid
+  listId       String?   @map("list_id") @db.Uuid
+  email        String
+  firstName    String?   @map("first_name")
+  lastName     String?   @map("last_name")
+  company      String?
+  title        String?
+  linkedinUrl  String?   @map("linkedin_url")
+  phone        String?
+  website      String?
+  industry     String?
+  customFields Json      @default("{}") @map("custom_fields")
+  status       String    @default("active") // active|unsubscribed|bounced|invalid
+  enrichedAt   DateTime? @map("enriched_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization     Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  list             ContactList?      @relation(fields: [listId], references: [id])
+  campaignContacts CampaignContact[]
+  inboxThreads     InboxThread[]
+
+  @@unique([orgId, email])
+  @@map("contacts")
+}
+
+// ─── Mailboxes ───────────────────────────────────────────────────────
+
+model Mailbox {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  email         String
+  provider      String   // gmail|outlook|smtp
+  credentials   Json?    // encrypted OAuth tokens or SMTP creds
+  dailyLimit    Int      @default(50) @map("daily_limit")
+  warmupEnabled Boolean  @default(false) @map("warmup_enabled")
+  reputation    Int      @default(100) // 0-100
+  status        String   @default("active") // active|paused|error|disconnected
+  sentToday     Int      @default(0) @map("sent_today")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sentEmails   SentEmail[]
+
+  @@map("mailboxes")
+}
+
+// ─── Campaigns ───────────────────────────────────────────────────────
+
+model Campaign {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  name        String
+  status      String    @default("draft") // draft|scheduled|active|paused|completed|archived
+  listId      String?   @map("list_id") @db.Uuid
+  schedule    Json?     // {timezone, days, start_hour, end_hour, throttle_per_hour}
+  trackOpens  Boolean   @default(true) @map("track_opens")
+  trackClicks Boolean   @default(true) @map("track_clicks")
+  createdBy   String?   @map("created_by") @db.Uuid
+  launchedAt  DateTime? @map("launched_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization     Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  list             ContactList?      @relation(fields: [listId], references: [id])
+  creator          User?             @relation(fields: [createdBy], references: [id])
+  sequenceSteps    SequenceStep[]
+  campaignContacts CampaignContact[]
+  sentEmails       SentEmail[]
+  emailEvents      EmailEvent[]
+  inboxThreads     InboxThread[]
+
+  @@map("campaigns")
+}
+
+// ─── Sequence Steps ──────────────────────────────────────────────────
+
+model SequenceStep {
+  id         String   @id @default(uuid()) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  stepNumber Int      @map("step_number")
+  type       String   // email|linkedin_connect|linkedin_message|sms|wait
+  delayDays  Int      @default(0) @map("delay_days")
+  subject    String?
+  body       String?
+  format     String   @default("plain") // plain|html|newsletter|minimal
+  variants   Json     @default("[]") // A/B test variants
+  condition  Json?    // {trigger: 'opened'|'clicked'|'replied'|'no_reply'}
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sentEmails SentEmail[]
+
+  @@map("sequence_steps")
+}
+
+// ─── Campaign Contacts (Enrollment) ─────────────────────────────────
+
+model CampaignContact {
+  id         String    @id @default(uuid()) @db.Uuid
+  campaignId String    @map("campaign_id") @db.Uuid
+  contactId  String    @map("contact_id") @db.Uuid
+  currentStep Int      @default(1) @map("current_step")
+  status     String    @default("enrolled") // enrolled|active|replied|finished|unsubscribed|bounced|failed
+  enrolledAt DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz
+
+  // Relations
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact    Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sentEmails SentEmail[]
+
+  @@unique([campaignId, contactId])
+  @@map("campaign_contacts")
+}
+
+// ─── Sent Emails ─────────────────────────────────────────────────────
+
+model SentEmail {
+  id              String   @id @default(uuid()) @db.Uuid
+  campaignId      String?  @map("campaign_id") @db.Uuid
+  campaignContactId String? @map("campaign_contact_id") @db.Uuid
+  stepId          String?  @map("step_id") @db.Uuid
+  mailboxId       String?  @map("mailbox_id") @db.Uuid
+  messageId       String?  @map("message_id") // SMTP Message-ID header
+  subject         String?
+  fromEmail       String?  @map("from_email")
+  toEmail         String?  @map("to_email")
+  sentAt          DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  status          String   @default("sent") // sent|delivered|bounced|failed
+
+  // Relations
+  campaign        Campaign?        @relation(fields: [campaignId], references: [id])
+  campaignContact CampaignContact? @relation(fields: [campaignContactId], references: [id])
+  step            SequenceStep?    @relation(fields: [stepId], references: [id])
+  mailbox         Mailbox?         @relation(fields: [mailboxId], references: [id])
+  emailEvents     EmailEvent[]
+
+  @@map("sent_emails")
+}
+
+// ─── Email Events ────────────────────────────────────────────────────
+
+model EmailEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  sentId     String?  @map("sent_id") @db.Uuid
+  orgId      String?  @map("org_id") @db.Uuid
+  campaignId String?  @map("campaign_id") @db.Uuid
+  contactId  String?  @map("contact_id") @db.Uuid
+  eventType  String   @map("event_type") // open|click|reply|bounce|unsubscribe|spam_report
+  metadata   Json?    // {url, ip, user_agent, link_text}
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  // Relations
+  sentEmail SentEmail? @relation(fields: [sentId], references: [id])
+  campaign  Campaign?  @relation(fields: [campaignId], references: [id])
+
+  @@map("email_events")
+}
+
+// ─── Inbox Threads ───────────────────────────────────────────────────
+
+model InboxThread {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  campaignId    String?   @map("campaign_id") @db.Uuid
+  contactId     String?   @map("contact_id") @db.Uuid
+  channel       String    @default("email") // email|linkedin|sms|whatsapp
+  status        String    @default("open") // open|closed|snoozed
+  label         String?   // interested|not_interested|ooo|wrong_person|meeting_booked
+  assignedTo    String?   @map("assigned_to") @db.Uuid
+  snoozedUntil  DateTime? @map("snoozed_until") @db.Timestamptz
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  campaign     Campaign?      @relation(fields: [campaignId], references: [id])
+  contact      Contact?       @relation(fields: [contactId], references: [id])
+  assignee     User?          @relation(fields: [assignedTo], references: [id])
+  messages     ThreadMessage[]
+
+  @@map("inbox_threads")
+}
+
+// ─── Thread Messages ─────────────────────────────────────────────────
+
+model ThreadMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  threadId  String   @map("thread_id") @db.Uuid
+  direction String   // inbound|outbound
+  body      String?
+  htmlBody  String?  @map("html_body")
+  fromEmail String?  @map("from_email")
+  toEmail   String?  @map("to_email")
+  aiSummary String?  @map("ai_summary")
+  sentAt    DateTime @default(now()) @map("sent_at") @db.Timestamptz
+
+  // Relations
+  thread InboxThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@map("thread_messages")
+}
+
+// ─── Templates Library ───────────────────────────────────────────────
+
+model Template {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String?  @map("org_id") @db.Uuid // NULL = global/public
+  name       String
+  category   String?  // cold_outreach|follow_up|breakup|newsletter|demo_request
+  format     String   @default("plain") // plain|html|newsletter|minimal
+  subject    String?
+  body       String?
+  thumbnail  String?
+  isPublic   Boolean  @default(false) @map("is_public")
+  usageCount Int      @default(0) @map("usage_count")
+  createdBy  String?  @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization Organization? @relation(fields: [orgId], references: [id])
+  creator      User?         @relation(fields: [createdBy], references: [id])
+
+  @@map("templates")
+}
+
+// ─── Subscriptions & Billing ─────────────────────────────────────────
+
+model Subscription {
+  id               String    @id @default(uuid()) @db.Uuid
+  orgId            String    @unique @map("org_id") @db.Uuid
+  stripeCustomerId String?   @map("stripe_customer_id")
+  stripeSubId      String?   @map("stripe_sub_id")
+  plan             String    // starter|growth|pro|enterprise
+  status           String?   // active|past_due|canceled|trialing
+  currentPeriodEnd DateTime? @map("current_period_end") @db.Timestamptz
+  emailQuota       Int?      @map("email_quota")
+  seatsQuota       Int?      @map("seats_quota")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─── Audit Logs ──────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String   // create|update|delete|login|export|import
+  entity    String   // campaign|contact|mailbox|user|template|settings
+  entityId  String?  @map("entity_id") @db.Uuid
+  metadata  Json?    // Additional context
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
