@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Filter, Mail, Phone, Linkedin, MoreVertical, Upload } from "lucide-react";
+import { Plus, Search, Filter, Mail, Phone, Linkedin, MoreVertical, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 

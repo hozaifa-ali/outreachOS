@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
-import { Search, Filter, MessageSquare, CornerUpLeft, MoreVertical, Star, Inbox as InboxIcon } from "lucide-react";
+import { Search, Filter, MessageSquare, CornerUpLeft, MoreVertical, Star, Inbox as InboxIcon, Send, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
