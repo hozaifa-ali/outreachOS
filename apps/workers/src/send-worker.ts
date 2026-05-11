@@ -27,7 +27,7 @@ export const sendWorker = new Worker('email.send', async (job) => {
     return { skipped: true, reason: cc.status };
   }
 
-  const step = cc.campaign.sequenceSteps.find(s => s.id === stepId);
+  const step = cc.campaign.sequenceSteps.find((s: any) => s.id === stepId);
   if (!step) throw new Error(`Step ${stepId} not found`);
 
   // 3. Render template
@@ -49,7 +49,7 @@ export const sendWorker = new Worker('email.send', async (job) => {
     orderBy: { sentToday: 'asc' },
   });
 
-  const mailbox = mailboxes.find(m => m.sentToday < m.dailyLimit && m.reputation > 60);
+  const mailbox = mailboxes.find((m: any) => m.sentToday < m.dailyLimit && m.reputation > 60);
   if (!mailbox) {
     // Requeue for later
     await sendQueue.add('email.send', job.data, { delay: 60 * 60 * 1000 });
@@ -127,7 +127,7 @@ export const sendWorker = new Worker('email.send', async (job) => {
   });
 
   // 12. Schedule next step if exists
-  const nextStep = cc.campaign.sequenceSteps.find(s => s.stepNumber === step.stepNumber + 1);
+  const nextStep = cc.campaign.sequenceSteps.find((s: any) => s.stepNumber === step.stepNumber + 1);
   if (nextStep) {
     const delayMs = (nextStep.delayDays || 1) * 24 * 60 * 60 * 1000;
     await sendQueue.add('email.send', { campaignContactId: cc.id, stepId: nextStep.id }, { delay: delayMs });
