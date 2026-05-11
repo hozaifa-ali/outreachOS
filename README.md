@@ -52,7 +52,7 @@ OutreachOS utilizes a **Turborepo** monorepo structure to share types, schemas, 
 Clone the repository and install all workspace dependencies:
 
 ```bash
-git clone https://github.com/your-username/outreachos.git
+git clone https://github.com/hozaifa-ali/outreachOS.git
 cd outreachos
 pnpm install
 ```

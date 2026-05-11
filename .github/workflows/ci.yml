@@ -11,6 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: System Initialize (OutreachOS)
+        run: |
+          echo -e "\033[38;2;99;102;241m"
+          echo '    ____        __                        __  ____  _____'
+          echo '   / __ \__  __/ /_________  ____  _____/ /_ / __ \/ ___/'
+          echo '  / / / / / / / __/ ___/ _ \/ __ `/ ___/ __ \/ / / \__ \ '
+          echo ' / /_/ / /_/ / /_/ /  /  __/ /_/ / /__/ / / / /_/ /___/ /'
+          echo ' \____/\__,_/\__/_/   \___/\__,_/\___/_/ /_/\____//____/ '
+          echo -e "\033[0m"
+          echo -e "\033[38;2;16;185;129m[SYSTEM] Neural net linked. Commencing build sequence...\033[0m"
+
       - name: Checkout code
         uses: actions/checkout@v4
 

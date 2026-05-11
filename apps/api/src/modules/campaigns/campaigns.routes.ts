@@ -91,7 +91,7 @@ export async function campaignRoutes(app: FastifyInstance) {
       }
 
       await prisma.campaignContact.createMany({
-        data: contacts.map(c => ({ campaignId: campaign.id, contactId: c.id })),
+        data: contacts.map((c: any) => ({ campaignId: campaign.id, contactId: c.id })),
         skipDuplicates: true,
       });
     }

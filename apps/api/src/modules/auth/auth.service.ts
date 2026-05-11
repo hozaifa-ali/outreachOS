@@ -18,7 +18,7 @@ export async function registerUser(input: RegisterInput) {
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
   const slug = generateUniqueSlug(input.orgName);
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: any) => {
     const org = await tx.organization.create({
       data: {
         name: input.orgName,

@@ -14,7 +14,7 @@ export async function mailboxRoutes(app: FastifyInstance) {
   app.get('/', async (req) => {
     const { orgId } = (req as AuthenticatedRequest).user;
     const mailboxes = await prisma.mailbox.findMany({ where: { orgId }, orderBy: { createdAt: 'desc' } });
-    return mailboxes.map(m => ({ ...m, credentials: undefined }));
+    return mailboxes.map((m: any) => ({ ...m, credentials: undefined }));
   });
 
   app.post('/connect/smtp', async (req, reply) => {

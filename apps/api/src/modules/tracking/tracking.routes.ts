@@ -14,7 +14,7 @@ export async function trackingRoutes(app: FastifyInstance) {
         eventType: 'open',
         metadata: { ip: req.ip, userAgent: req.headers['user-agent'] },
       },
-    }).catch(err => req.log.error(err, 'Failed to record open event'));
+    }).catch((err: any) => req.log.error(err, 'Failed to record open event'));
 
     // Return transparent 1x1 GIF
     const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
@@ -38,7 +38,7 @@ export async function trackingRoutes(app: FastifyInstance) {
         eventType: 'click',
         metadata: { url, ip: req.ip, userAgent: req.headers['user-agent'] },
       },
-    }).catch(err => req.log.error(err, 'Failed to record click event'));
+    }).catch((err: any) => req.log.error(err, 'Failed to record click event'));
 
     reply.status(302).redirect(url as string);
   });
