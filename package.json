@@ -5,7 +5,7 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "node scripts/boot.js",
     "dev:api": "turbo run dev --filter=@outreachos/api",
     "dev:web": "turbo run dev --filter=@outreachos/web",
     "dev:workers": "turbo run dev --filter=@outreachos/workers",
